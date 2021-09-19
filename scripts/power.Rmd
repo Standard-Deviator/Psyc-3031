@@ -1,0 +1,55 @@
+---
+author: "Mark Christopher Adkins"
+date: '`r paste("Created: 2020-09-12"," Last Modified: ", format(Sys.Date()))`'
+title: 'Power'
+output:
+  html_document:
+    toc_float: true
+    toc_depth: 4
+    number_sections: FALSE
+    toc: true
+    self_contained: true
+    css: "../misc/style.css"
+knit: (function(inputFile, encoding) {
+    rmarkdown::render(inputFile, encoding = encoding, output_dir = here::here("HTML Exercises"))})
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pwr)
+```
+
+```{r klippy, echo=FALSE, include=TRUE}
+klippy::klippy(position = c('top', 'right'))
+```
+
+## Power
+
+To conduct a power analysis, we will use a function from the {pwr} package. We specify the sample size (*n*), the significance level (*sig.level*), and the effect size (*d*) we want to be able to detect.
+
+```{r}
+# conduct the the power of the test to detect an effect size of d = .2
+pwr.t.test(n = 16,
+           sig.level = .05,
+           d = .2)
+```
+```{r echo=FALSE}
+# conduct the the power of the test to detect an effect size of d = .2
+power_results <- pwr.t.test(n = 16,
+           sig.level = .05,
+           d = .2)
+```
+
+If this study were repeated numerous times using the same sample size, and sampling from the same population, about `r round(power_results$power,3)*100` percent of those studies would detect a effect at least as large as `r power_results$d`.
+
+## Power
+
+To conduct a power analysis, we will use a function from the {pwr} package. We specify the sample size (*n*), the significance level (*sig.level*), and the effect size (*d*) we want to be able to detect. We also need to tell the function that we want the power for a paired t-test.
+
+```{r}
+pwr.t.test(n = 5,
+           d = .2,
+           sig.level = .05,
+           type = "paired")
+```
+

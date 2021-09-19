@@ -1,0 +1,90 @@
+body{
+  font-family: Helvetica;
+  font-size: 16pt;
+}
+
+/* -----------revealing output------------- */
+input:checked + div { display: none; }
+
+.r{ /* Code block */
+    font-size: 20px;
+}
+
+pre { /* Code block - determines code spacing between lines */
+    font-size: 20px;
+}
+
+/* -----------div tips------------- */
+
+  div.puzzle, div.fyi, div.demo, div.note,
+div.grimace, div.example {
+    padding: 1em;
+    margin: 1em 0;
+    padding-left: 100px;
+    background-size: 70px;
+    background-repeat: no-repeat;
+    background-position: 15px center;
+    min-height: 120px;
+    color: #1f5386;
+    background-color: #bed3ec;
+    border: solid 5px #dfedff;
+  }
+
+div.puzzle {
+  background-image: url("../misc/Your-turn.png");
+  background-color: #AFD275;
+  border-color: #479761;
+}
+
+div.fyi {
+ background-image: url("../misc/fyi.png");
+}
+
+div.demo {
+  background-image: url("../misc/Live-code.png");
+}
+
+div.note {
+  background-image: url("../misc/lightbulb.png");
+  background-color: #F3D250;
+/*#FCCD04;*/
+  border-color: #FFE400;
+}
+
+div.grimace {
+  background-image: url("../misc/grimace-regular.svg");
+  background-color: #A64AC9;
+  border-color: #44318D;
+  fill: #ff0000;
+  color: black;
+}
+
+div.example {
+  background-color: #6B6E70;
+  border-color: #474B4F;
+  color: white;
+}
+
+div svg {
+ fill: white;
+}
+
+div.grimace:hover {
+    background-color: #44318D; 
+  border-color:#A64AC9;
+}
+
+.tippy-tooltip {
+  font-size: 2rem;
+  padding: 0.3rem 0.6rem;
+}
+
+/* added column layouts */
+div.cols {
+  width: 50%;
+  box-sizing: shadow-box;
+  padding: 20px;
+  overflow-x: scroll;
+  overflow-y: scroll;
+  max-height: 100vh;
+}

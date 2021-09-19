@@ -1,0 +1,430 @@
+---
+author: "Mark Christopher Adkins"
+date: '`r paste("Created: 2020-09-12"," Last Modified: ", format(Sys.Date()))`'
+title: 'T-Tests'
+output:
+  html_document:
+    toc_float: true
+    toc_depth: 4
+    number_sections: FALSE
+    toc: true
+    self_contained: true
+    css: "../misc/style.css"
+knit: (function(inputFile, encoding) {
+    rmarkdown::render(inputFile, encoding = encoding, output_dir = here::here("HTML Exercises"))})
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r klippy, echo=FALSE, include=TRUE}
+klippy::klippy(position = c('top', 'right'))
+```
+
+# Independent Samples t-Test
+
+This set of exercises will demonstrate how to verify that the assumptions have been met prior to conducting an independent sample t-test.
+
+To begin, let's load the libraries which will give us access to the functions we will need today.
+
+## Load Libraries
+
+```{r load_libraries, message=FALSE, warning=FALSE}
+# Exercises: practice running independent/dependent t-tests
+
+library(pwr)       # power/sample size calcs
+library(car)       # leveneTest()
+library(psych)     # describeBy()
+library(tidyverse) 
+library(effsize)   # cohen.d()
+```
+
+:::fyi
+If you have trouble installing the {tidyverse} package, you can install/load the individual packages that we need.
+```{r eval=FALSE}
+library(readr)   # parse_factor()
+library(dplyr)   # for easier subsetting and
+# data manipulation
+library(forcats) # create/mutate factors easier
+library(ggplot2) # graphics
+```
+:::
+
+## Create/Import Data
+
+The next step is to either load some data into R or create some data ourselves. For the exercises within this lab, we will create some data.
+
+```{r create_data}
+# create a vector which holds our outcome/dependent variable
+# - 16 scores for each group so 16 x 2 = 32 scores
+recall <- c(4,5,2,4,6,7,6,6,2,5,4,3,3,3,5,3,
+            5,2,4,2,2,3,1,5,3,2,3,3,4,1,5,3)
+
+# create a vector which holds our grouping variable (sometimes called a predictor or factor)
+# - 16 subjects per group
+group <- c(rep(1,16),
+           rep(2,16))
+
+# combine the two vectors into a data.frame
+humour <- data.frame(recall,group)
+```
+
+:::fyi
+We can also create our data.frame/tibble in one step.
+```{r eval=FALSE}
+dep_data <- data.frame(recall = c(4,5,2,4,6,7,6,6,
+                                  2,5,4,3,3,3,5,3,
+                                  5,2,4,2,2,3,1,5,
+                                  3,2,3,3,4,1,5,3),
+                       group = c(rep(1,16),
+                                  rep(2,16)))
+```
+:::
+
+Now let's take a peek at our data.
+
+```{r}
+# print the data to the console
+humour
+```
+
+:::fyi
+We can take a peek at the data using the `View()` function (Note: `View()` has a capital "V").
+```{r eval=FALSE}
+# type this into the console pane to see the dataset as a spreadsheet within RStudio
+View(humour)
+```
+:::
+
+## Clean Up the Data {.tabset .tabset-fade .tabset-pills}
+
+Prior to conducting the t-test, we first need to clean up and prepare our data.
+
+One place to start is the variable we created called `group`. Right now, it only has two unique values which designate the group to which each subject belongs.
+
+```{r}
+unique(humour$group)
+```
+:::fyi
+If you want to pull a single vector from a data.frame/tibble, you can use the subsetting operator `$`. This can often be useful when a function you are using requires a single vector and not your whole dataset.
+
+You begin by writing the name of the data.frame/tibble, and you follow it by the `$` operator, and then the name of the vector you need.
+```{r eval=FALSE}
+# extract the age variable
+humour$age
+```
+:::
+
+The values 1 and 2 aren't very descriptive, so our next step is to convert this vector of 1's and 2's into a factor and recode the first level of the factor to "Humourous" and the second level to "Non-humourous".
+
+:::note
+When converting a integer vector into a factor, it is usually necessary to first convert it to a character vector (e.g., the value 1 becomes the character "1")
+:::
+
+### Puzzle 
+
+:::puzzle
+Try to fill in the code to convert the `group` variable into a factor and change the levels of this factor to have more descriptive names.
+
+```{r eval=FALSE}
+# convert group to a factor,
+# and give the levels better names
+humour <- mutate(humour,
+                 group = <YOUR CODE HERE>)
+```
+:::
+
+### Show Solution
+
+:::puzzle
+```{r}
+# convert group to a factor,
+# and give the levels better names
+humour <- mutate(humour,
+            group = as.character(group),
+            group = fct_recode(group,
+                        "Humourous" = "1",
+                        "Non-humourous" = "2"))
+```
+:::
+
+
+## Check Assumptions
+
+### Normality in **Each** Group
+
+#### QQ-Plots
+
+A quantile-quantile (qqplot) is one way to visually assess whether a variable is approximately normally distributed. If each variable were normally distributed, then the points would fall exactly on the line.
+
+To construct a qq-plot using the {ggplot2} package, begin by passing our data.frame/tibble to  the `ggplot()` function and map the variable *recall* to the *sample* aesthetic. Next add a layer of points (using `geom_qq()`) and the quantile line (using `geom_qq_line()`). The final step for assessing the distribution of recall scores across both groups is to create a panel for each group using the `facet_grid()` function.
+
+```{r}
+# assess normality using a qqplot
+# - for qqplot you need to use an aesthetic called "sample"
+ggplot(humour, aes(sample = recall)) +
+    geom_qq() +
+    geom_qq_line() +
+    facet_grid(~group)
+```
+
+:::fyi
+If you want to create panels of plots, `facet_grid()` has a way to specify that the panels should be displayed as columns or rows (or both if you use two variables). You can write your code like this: `facet_grid(row~column)`. Where *row* is the name of the variable you want to create a row of panels for, while *column* is the name of the variable you want to create a column of panels for. You can leave either one blank if you are only using one variable.
+
+For instance, `facet_grid(~group)` uses each value of group to create a column of plots.
+:::
+
+#### Box Plots
+
+A box plot is another way to visually assess the distribution of a variable. A few things to look for when assessing a distribution for normality:  
+
+  * The median is centered within the box (the inter-quartile)  
+  * There are no outliers  
+  * Both whiskers extend an appropriate amount beyond the upper and lower edges of the box.  
+
+```{r}
+# create a box plot to show "recall" distribution for each group
+ggplot(humour, aes(x = group, y = recall)) +
+    geom_boxplot()
+```
+
+#### Using Descriptive Statistics
+
+In past exercises, we have used the `describe()` function to compute descriptive statistics. Today, we will use a related function from the {psych} package called `describeBy()` (note the capital "B"). This will break your data set into groups, and compute descriptive statistics separately for each group.
+
+This function needs two vectors; one vector which you want descriptive statistics for, and one vector which tells the function how to subset your data first.
+
+```{r}
+# assess normality using descriptive statistics
+describeBy(x = humour$recall,
+           group = humour$group)
+```
+
+:::fyi
+The describeBy() function from the {psych} package also has some other handy arguments. If you want the results returned as a data.frame with a specific number digits reported, then you can try the following code.
+```{r eval=FALSE}
+# return results as a data.frame with 3 digits of precision
+describeBy(x = humour$recall,
+           group = humour$group,
+           digits = 3,
+           mat = TRUE)
+```
+
+:::
+
+### Homogeneity of Variance
+
+Levene's test can be used to assess for violations of homogeneity of variance. The {car} package has a function to compute the test for us, `leveneTest()`. The argument `y` is the variable/vector you are assessing, and the `group` argument is the variable/vector you want to use to determine the grouping. By default, this function uses the median as the center, but you can override this by including the argument `center = "mean"`. That being said, using the median as the center is a more robust version of this test that is less sensitive to skewed distributions.
+
+```{r}
+# assess homogeneity of variance using leveneTest() function
+leveneTest(y = humour$recall,
+           group = humour$group,
+           center = "mean")
+```
+
+:::fyi
+You can also use this function using formula notation. To do this, start with your continuous variable you want to test followed by `~` (tilde is just to the left of the 1 key on the keyboard) and the grouping variable. Don't forget to also tell the function the name of the data.frame where these vectors "live".
+```{r}
+# Using formula notation
+leveneTest(y = recall~group,
+           data = humour,
+           center = "mean")
+```
+:::
+
+## Effect Size
+
+To compute a standardized effect size (Cohen's d), we can use the `cohen.d()` function from the {effsize} package. We can also write this function using formula notation. It can also be a good idea to include the argument `pooled = TRUE` to ensure that the standard deviations are pooled for both groups.
+
+```{r}
+# compute Cohen's d
+cohen.d(formula = recall~group,
+        data = humour,
+        pooled = TRUE)
+```
+
+:::note
+The {psych} package also has a function named `cohen.d()`. If you want to be sure that you are using the right function from a particular package you can try the following tip. Write the name of the package followed by `::` (this is called the scope resolution operator in case you need to Google it) and then the name of the function you want to use.
+```{r eval=FALSE}
+effsize::cohen.d(formula = recall~group,
+        data = humour,
+        pooled = TRUE)
+```
+:::
+
+## Conduct Independent Samples t-test {.tabset .tabset-fade .tabset-pills}
+
+To conduct an independent samples t-test in R, we can use the `t.test()` function (this function is in the {stats} package which is pre-loaded for us). By default, this function assumes that the assumption of homogeneity of variance has not been met (i.e. the Welch test).
+
+```{r}
+# conduct Welch independent-samples t-test
+t.test(formula = recall ~ group,
+       data = humour)
+```
+
+:::fyi
+If you want to conduct the the traditional t-test, simply include an additional argument to tell the function to assume that the assumption of homogeneity of variance has been sufficiently met.
+```{r}
+# conduct independent-samples t-test
+t.test(formula = recall ~ group,
+       data = humour,
+       var.equal = TRUE)
+```
+:::
+
+### Puzzle
+
+:::puzzle
+Let's say that you wanted to conduct a one-sided t-test, how would you change the following code to test that the upper tail?
+```{r eval=FALSE}
+t.test(formula = recall ~ group,
+       data = humour,
+       <YOUR CODE HERE>)
+```
+:::
+
+### Show Solution
+:::puzzle
+Let's say that you wanted to conduct a one-sided t-test, how would you change the following code to test that the true mean difference is greater than zero?
+```{r}
+t.test(formula = recall ~ group,
+       data = humour,
+       alternative = "greater")
+```
+:::
+
+# Wilcoxon Rank Test
+
+If your dependent variable is ordinal or heavily skewed, then conducting a normal t-test is not appropriate. The Wilcoxon rank sum test (aka the Mann-Whitney U test) would be more appropriate.
+
+```{r}
+wilcox.test(formula = recall ~ group,
+            data = humour,
+            conf.int = TRUE,
+            exact = FALSE,
+            correct = FALSE)
+```
+
+:::fyi
+The parameters `exact` and `correct` are set to FALSE to ensure that the output matches the lecture slides. Without them, the function will also print out some warnings. For the purpose of this class, you don't need to worry about the `exact` or `correct` arguments.
+:::
+
+# Dependent Samples t-test
+
+When a study uses the same subject in both conditions, then a dependent samples t-test is more appropriate. The libraries we need will be the same as for the independent samples t-test (so they should already be loaded).
+
+## Create/Import Data
+
+Let's create some data today by creating two vectors, one for before treatment and another for after treatment. It is also good practice to put these vectors into a data.frame/tibble. This makes it impossible for each subject's scores to get mixed up.
+
+```{r}
+before <- c(6, 10, 3, 5, 7)
+after <- c(1, 2, 0, 5, 2)
+
+dep_data <- tibble(before = before,
+                       after = after)
+```
+
+:::fyi
+We can also create our data.frame/tibble in one step.
+```{r eval=FALSE}
+dep_data <- tibble(before = c(6, 10, 3, 5, 7),
+                       after = c(1, 2, 0, 5, 2))
+```
+:::
+
+## Clean Up the Data
+
+For some of our diagnostics, we will need difference scores so let's go ahead and compute them.
+
+```{r}
+dep_data <- dep_data %>% 
+  mutate(diff_score = before - after)
+```
+
+## Check Assumptions
+
+### Normality of Difference Scores
+
+#### QQ-Plots
+
+A quantile-quantile (qqplot) is one way to visually assess whether a variable is approximately normally distributed. If each variable were normally distributed, then the points would fall exactly on the line.
+
+To construct a qq-plot using the {ggplot2} package, begin by passing our data.frame/tibble to  the `ggplot()` function and map the variable *recall* to the *sample* aesthetic. Next add a layer of points (using `geom_qq()`) and the quantile line (using `geom_qq_line()`).
+
+```{r}
+dep_data %>% 
+  ggplot(aes(sample = diff_score)) +
+  geom_qq() + 
+  geom_qq_line()
+```
+
+#### Box Plot
+
+
+A box plot is another way to visually assess the distribution of a variable. A few things to look for when assessing a distribution for normality:
+  * The median is centered within the box (the inter-quartile)
+  * There are no outliers
+  * Both whiskers extend an appropriate amount beyond the upper and lower edges of the box.
+
+```{r}
+dep_data %>% 
+  ggplot(aes(y = diff_score)) +
+  geom_boxplot()
+```
+
+### Using Descriptive Statistics
+
+Currently, our data.frame/tibble has 3 variables, but for the dependent samples t-test we only need to describe our difference scores.
+
+```{r}
+describe(dep_data$diff_score)
+```
+
+## Effect Size
+
+To compute a standardized effect size (Cohen's d), we can use the `cohen.d()` function from the {effsize} package. For the dependent samples t-test, we need to use the *before* and *after* variables to compute the effect size. Don't forget to set `paired = TRUE`, so that the function knows to pair the scores when computing the effect size.
+
+```{r}
+# compute Cohen's d
+cohen.d(d = dep_data$before,
+        f = dep_data$after,
+        paired = TRUE)
+
+```
+
+## Conduct Dependent Samples t-test
+
+For this test, we need to use the *before* and *after* vectors (the difference scores are computed for us within the function). We also need to tell the test that the scores should be treated as pairs via the `paired` argument.
+
+```{r}
+t.test(x = dep_data$before,
+       y = dep_data$after,
+       paired = TRUE)
+```
+# Wilcoxon Signed Rank Test
+
+We can conduct the Wilcoxon Signed Rank Test using the `wilcox.test()` function. Similar to the Wilcoxon Rank Test (above), we need to provide the function two arguments (`x` and `y`), as well as another argument to tell the function that the data should be treated as pairs (`paired = TRUE`).
+
+```{r}
+wilcox.test(x = dep_data$before,
+            y = dep_data$after,
+            conf.int = TRUE,
+            exact = FALSE,
+            conf.level = .8,
+            correct = FALSE,
+            paired = TRUE)
+```
+
+:::note
+As with the Wilcoxon Rank Test (above), the arguments `exact` and `correct` suppress warnings. In practice, these warnings are quite important, but we won't use them in this class. You can also change the confidence level via the `conf.level` argument.
+:::
+
+# Acknowledgements
+
+  * The lovely "DIV TIPS" were made using code from a fantastic blog entry by Desirée de leon at [https://desiree.rbind.io/post/2019/making-tip-boxes-with-bookdown-and-rmarkdown/](https://desiree.rbind.io/post/2019/making-tip-boxes-with-bookdown-and-rmarkdown/)
+  * The copy to clipboard buttons were created using Klippy [https://rlesur.github.io/klippy/reference/klippy.html](https://rlesur.github.io/klippy/reference/klippy.html)
+
+<a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc/4.0/88x31.png" /></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/">Creative Commons Attribution-NonCommercial 4.0 International License</a>.

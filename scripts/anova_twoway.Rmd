@@ -1,0 +1,292 @@
+---
+author: "Mark Christopher Adkins"
+date: '`r paste("Created: 2020-09-11"," Last Modified: ", format(Sys.Date()))`'
+title: 'ANOVA Twoway'
+output:
+  html_document:
+    toc_float: true
+    number_sections: FALSE
+    toc: true
+    self_contained: true
+    css: "../misc/style.css"
+knit: (function(inputFile, encoding) {
+    rmarkdown::render(inputFile, encoding = encoding, output_dir = here::here("HTML Exercises"))})
+---
+
+```{r setup, include=FALSE}
+# default knitr options
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r klippy, echo=FALSE, include=TRUE}
+# create "copy to clipboard button" for each code chunk
+klippy::klippy(position = c('top', 'right'))
+```
+
+# ANOVA - Two-way Independent Samples
+
+## Load Libraries
+
+```{r load_libraries, message=FALSE, warning=FALSE}
+library(car)     # leveneTest()
+library(psych)   # describeBy()
+library(ez)      # ezANOVA()
+library(here)
+library(tidyverse)
+```
+
+:::fyi
+If you have trouble installing the tidyverse package, you can install/load the individual packages that we need.
+```{r eval=FALSE}
+library(dplyr)   # mutate()
+library(forcats) # fct_recode()
+library(ggplot2) # plotting
+library(readr)   # importing csv
+```
+:::
+
+## Create/Import Data
+
+The next step is to either load some data into R or create some data ourselves. For the exercises within this lab, we will load some data from the file "speed_data.csv" (which should be inside the "data" folder within your R project).
+
+```{r import_data}
+# import data using the read_csv() function
+data_ANOVA_twoway <- read_csv(file = here("data",
+                            "message_quality.csv"))
+```
+
+## Clean Up the Data
+
+For data imported using the {readr} package, you can check whether there were any parsing problems using the `problems()` function.
+
+```{r check_for_problems}
+# check for parsing problems
+# e.g., were there problems forcing a variable to be a certain type
+problems(data_ANOVA_twoway)
+```
+
+It is always a good idea to `View()` your data **every** time you import it to ensure that the data look the way expect. This is especially important if you have never seen the data before.
+
+```{r eval=FALSE}
+# take a peak at the data
+View(data_ANOVA_twoway)
+```
+
+```{r echo=FALSE}
+# HTML friendly data display
+rmarkdown::paged_table(data_ANOVA_twoway)
+```
+
+This dataset looks a bit different than the other datasets which we have seen in the other exercises. Two of these variables need be converted to factors (*message_type* and *authoritarianism*), but they are already *character* data (instead of numbers). At this point we only need to convert them to factors using `parse_factor()` from the *readr* package.
+
+```{r create_factor}
+data_ANOVA_twoway <- data_ANOVA_twoway %>% 
+  mutate(message_type = parse_factor(message_type),
+         authoritarianism = parse_factor(authoritarianism))
+```
+
+:::fyi
+We can check that the levels of *message_type* are what we were expecting.
+```{r}
+# check the valid levels of message_type
+levels(data_ANOVA_twoway$message_type)
+```
+We can count the number of levels a factor has using the `length()` function on the results we got from using the `levels()` function above.
+```{r}
+levels(data_ANOVA_twoway$message_type) %>% 
+  length()
+```
+
+Always check the levels of a factor **prior** to running any analyses using the data.
+:::
+
+We can also check that all of the combinations of our factors matches the design of our study. This example is referred to as a
+$$\color{blue}{2} \times \color{blue}{2}\space ANOV\!A$$
+Where the number of blue digits represent the number of factors in the study design, and the values of each digit represents the number of levels for each respective factor. Multiplying the number of levels for each factor together tells us how many conditions (groups) are in the design. In our current example there are $\color{blue}{2} \times \color{blue}{2}=4$ conditions.
+
+We can use the following code to verify that there are four conditions using the two factors. Each row represents a unique combination of factor levels inside our 2x2 ANOVA. You can check the unique combinations of variables/factors using the `distinct()` function from the {dplyr} package.
+
+```{r}
+# show the distinct combinations of all levels 
+# for message_type & authoritarianism
+data_ANOVA_twoway %>% 
+  distinct(message_type,authoritarianism)
+```
+
+:::fyi
+If you are interested in also getting the sample size for each condition in your 2x2 ANOVA design, you can first use `group_by()` and follow it with the `count()` function (both are from the {dplyr} package).
+```{r}
+# group the data using the 2 factors, then count the rows in each subset of the data
+data_ANOVA_twoway %>% 
+  group_by(message_type,authoritarianism) %>% 
+  count()
+
+```
+
+You can learn more about how to use `group_by()` in the “Derive Information with dplyr” primer at [https://rstudio.cloud/learn/primers/2.3](https://rstudio.cloud/learn/primers/2.3).
+:::
+
+## Check Assumptions
+
+### Normality in **Each** Group
+
+#### QQ-Plots
+
+A quantile-quantile (qq-plot) is one way to visually assess whether a variable is approximately normally distributed. If each variable were normally distributed, then the points would fall exactly on the line.
+
+To construct a qq-plot using the {ggplot2} package, begin by passing our data.frame/tibble to  the `ggplot()` function and map the variable *quality* to the *sample* aesthetic. Next add a layer of points (using `geom_qq()`) and the quantile line (using `geom_qq_line()`). The final step for assessing the distribution of recall scores across both groups is to create a panel for each group using the `facet_grid()` function.
+
+```{r}
+# assess normality using a qqplot
+# - for qqplot you need to use an aesthetic called "sample"
+ggplot(data = data_ANOVA_twoway,
+       mapping = aes(sample = quality)) +
+    geom_qq() +
+    geom_qq_line() +
+    facet_grid(message_type~authoritarianism)
+```
+
+
+#### Box Plots
+
+A box plot is another way to visually assess the distribution of a variable. A few things to look for when assessing a distribution for normality:
+
+  * The median is centred within the box (the inter-quartile)
+  * There are no outliers
+  * Both whiskers extend an appropriate amount beyond the upper and lower edges of the box.
+
+```{r}
+# create a box plot to show "recall" distribution for each group
+ggplot(data_ANOVA_twoway, aes(x = message_type, y = quality, fill = authoritarianism)) +
+    geom_boxplot()
+```
+
+#### Using Descriptive Statistics
+
+In past exercises, we have used the `describe()` function to compute descriptive statistics. Today, we will use a related function from the {psych} package called `describeBy()` (note the capital "B"). This will break your data set into groups, and compute descriptive statistics separately for each group.
+
+This function needs three vectors; one vector which you want descriptive statistics for, and two others vector which tell the function how to subset your data first. You need to wrap the two grouping variables inside the `list()` function.
+
+```{r}
+# assess normality using descriptive statistics
+describeBy(x = data_ANOVA_twoway$quality,
+           group = list(data_ANOVA_twoway$message_type,
+                        data_ANOVA_twoway$authoritarianism))
+```
+
+### Homogeneity of Variance
+
+Levene's test can be used to assess for violations of homogeneity of variance. The {EZ} package conducts Levene's test along with the ANOVA. See output below (in conduct test section).
+
+
+## Effect Size
+
+For a two-way ANOVA, one recommended effect size which should be reported and interpreted is generalized eta-squared, $\eta_G^2$. When you conduct the two-way ANOVA using the `ezANOVA()` function, $\eta_G^2$ is computed for you (though the function labels the output as *ges*).
+
+## Conduct Test
+
+We will use the {EZ} package to conduct our ANOVA test (and Levene's test). Specifically, we will use the `ezANOVA()` function because it can be used to conduct a variety of ANOVA tests, so once we learn this function it will help us later on as well. To conduct a two-way ANOVA you need to specify four arguments:
+
+  * *data* -  the data.frame/tibble where you data "lives"
+  * *wid* - a variable with a unique subject id for each subject
+    * if the variable you supply to the *wid* argument is not a factor, the function will temporarily convert it for you
+  * *between* - a **set of variables** containing grouping information
+    * This gets a little different here because we have two *between* (subject factors)
+  * *dv* - the outcome variable
+
+```{r}
+# conduct an independent samples ANOVA
+# then save the results into an object
+ANOVA_results <- ezANOVA(data = data_ANOVA_twoway,
+        wid = ID,
+        between = message_type:authoritarianism,
+        dv = quality)
+```
+
+:::note
+R often uses a ":" to denote an interaction between terms, so in the output above *message_type:authoritarianism* is the interaction between the two factors in our design.
+:::
+
+:::fyi
+If you are unsure what some of the values in the `ezANOVA()` output are referring to, then check the help documentation in the *Value* section. You can open the help documentation using the following code.
+```{r eval=FALSE}
+?ez::ezANOVA
+```
+:::
+
+```{r}
+# Check the results from Levene's test
+ANOVA_results$`Levene's Test for Homogeneity of Variance`
+```
+
+:::note
+Be sure to ALWAYS always check the results of Levene's test PRIOR to checking the ANOVA results because if there was a problem with heterogeneity of variances then you can't trust the *p*-value form the ANOVA.
+
+If there is evidence that the homogeneity of variance assumption was not met, then you can use a "Huber-White" correction called a heteroscedasticity-corrected covariance matrices (hccm). The `ezANOVA()` function can do this by passing an additional argument `white.adjust = TRUE`.
+:::
+
+```{r eval=FALSE}
+ANOVA_results$ANOVA
+```
+
+```{r echo=FALSE}
+# Check the results from the ANOVA test
+ANOVA_results$ANOVA %>% 
+  rmarkdown::paged_table()
+```
+
+## Post-Hoc Tests
+
+There are a few ways to conduct a post-hoc test. One way is subset the data using the levels of one factor, and conduct the tests across the levels of the other factor.
+
+The first step is to create two subsets using the levels of *authoritarianism*.
+
+```{r}
+# create subsets of data using the levels of authoritarianism
+data_low_auth <- filter(data_ANOVA_twoway,
+                        authoritarianism == "low")
+data_high_auth <- filter(data_ANOVA_twoway,
+                         authoritarianism == "high")
+```
+
+The next step is to create two *aov* (ANOVA) objects for each of our subsets.
+
+```{r}
+# create ANOVA model to use with the TukeyHSD() function
+low_auth_model  <- aov(quality ~ message_type,
+                       data = data_low_auth)
+high_auth_model <- aov(quality ~ message_type,
+                       data = data_high_auth)
+```
+
+The last step is to use `TukeyHSD()` function.
+
+```{r}
+TukeyHSD(x = low_auth_model)
+TukeyHSD(x = high_auth_model)
+```
+
+# ANOVA using Trimmed Means
+
+In the event the the assumption of normality and homogeneity of variance was not met, a special case of ANOVA which examines differences between trimmed means can be conducted.
+
+You first need a new package which we have not used before, {WRS2}. Don't forget to load the package.
+
+```{r}
+library("WRS2")
+```
+
+
+```{r}
+t2way(formula = quality ~ message_type * authoritarianism,
+      data = data_ANOVA_twoway,
+      tr = .1)
+```
+
+
+# Acknowledgements
+
+  * The lovely "DIV TIPS" were made using code from a fantastic blog entry by Desirée de leon at [https://desiree.rbind.io/post/2019/making-tip-boxes-with-bookdown-and-rmarkdown/](https://desiree.rbind.io/post/2019/making-tip-boxes-with-bookdown-and-rmarkdown/)
+  * The copy to clipboard buttons were created using Klippy [https://rlesur.github.io/klippy/reference/klippy.html](https://rlesur.github.io/klippy/reference/klippy.html)
+
+<a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc/4.0/88x31.png" /></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/">Creative Commons Attribution-NonCommercial 4.0 International License</a>.

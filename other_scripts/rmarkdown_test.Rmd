@@ -1,0 +1,23 @@
+---
+title: "Test"
+author: "Mark Christopher Adkins"
+date: "09/03/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(psych)
+```
+
+```{r}
+# import data using a hacky way
+data <- read_csv("../data/sleepdata.csv") # little note
+
+# import data using relative paths
+data <- read_csv(here::here("data","sleepdata.csv")) %>% 
+  mutate() %>%
+  filter()
+```
+

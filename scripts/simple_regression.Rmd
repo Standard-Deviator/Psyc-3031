@@ -1,0 +1,169 @@
+---
+author: "Mark Christopher Adkins"
+date: '`r paste("Created: 2020-11-11"," Last Modified: ", format(Sys.Date()))`'
+title: 'Simple Regression'
+output:
+  html_document:
+    toc_float: true
+    number_sections: FALSE
+    toc: true
+    self_contained: true
+    css: "../misc/style.css"
+knit: (function(inputFile, encoding) {
+    rmarkdown::render(inputFile, encoding = encoding, output_dir = here::here("HTML Exercises"))})
+---
+
+```{r setup, include=FALSE}
+# default knitr options
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r klippy, echo=FALSE, include=TRUE}
+# create "copy to clipboard button" for each code chunk
+klippy::klippy(position = c('top', 'right'))
+```
+
+# Simple Regression
+
+## Load Libraries {.tabset .tabset-fade .tabset-pills}
+
+```{r load_libraries, message=FALSE, warning=FALSE}
+library(broom)     # tidy() and glance()
+library(psych)     # describeBy()
+library(here)      # here() for relative file paths
+library(QuantPsyc) # standardized coefficients
+library(tidyverse)
+```
+
+::: {.fyi}
+If you have trouble installing the tidyverse package, you can install/load the individual packages that we need.
+
+```{r eval=FALSE}
+library(dplyr)   # mutate()
+library(ggplot2) # plotting
+library(readr)   # importing csv
+```
+:::
+
+
+## Create/Import Data
+
+As usual, the next step is to either load some data into R or create some data ourselves. For the exercises within this lab, we will load some data from the file "gradgpa.csv" (which should be inside the "data" folder within your R project).
+
+```{r import_data}
+# import data
+data_corr <- read_csv(file = here("data",
+                            "gradgpa.csv"))
+```
+
+## Clean Up the Data {.tabset .tabset-fade .tabset-pills}
+
+For data imported using the {readr} package, you can check whether there were any parsing problems using the `problems()` function.
+
+```{r check_for_problems}
+# check for parsing problems
+# e.g., were there problems forcing a variable to be a certain type
+problems(data_corr)
+```
+
+It is always a good idea to `View()` your data **every** time you import it to ensure that the data look the way expect. This is especially important if you have never seen the data before.
+
+```{r eval=FALSE}
+# take a peak at the data
+View(data_corr)
+```
+
+```{r echo=FALSE}
+# HTML friendly data display
+rmarkdown::paged_table(data_corr)
+```
+
+Everything looks to be in order with regard to the types of variables in this data set.
+
+## Fit a Simple Regression Model
+
+To fit a regression model in *R* (either simple or multiple) we can use the `lm()` function from base *R*.
+
+There are at least two function arguments needed to fit a regression model: *formula*, and *data*.
+
+We have used formulas a bit in our exercises so far, but here is a bit of a recap.
+
+  * Formulas have a left-hand side (LHS) and a right-hand side (RHS) separated by a tilde (~).
+  * The LHS is for the dependent variable (DV)
+  * The RHS is for the independent variables  (IV) and their interactions (there will be more on interactions next week).
+  
+A simple regression model has one continuous DV and one IV (typically also continuous).
+
+Let's try to regress `GradGPA` onto `UndergradGPA`.
+
+```{r}
+# simple regression model
+simple_lm_model <- lm(formula = GradGPA ~ UndergradGPA,
+                      data = data_corr)
+```
+
+We can check the results from our simple regression model using the `summary()` function on our results object (`simple_lm_model`).
+
+```{r}
+summary(simple_lm_model)
+```
+
+If you want to get the results from our regression model into a tibble, you can use the `tidy()` and `glance()` functions from the {broom} package.
+
+The `tidy()` function extracts the estimates for the intercepts and regression coefficients, their test statistics, standard error, and p values. You can also set `conf.int = TRUE` to get confidence intervals around the intercept and regression coefficients. This will add two new columns (`conf.low` and `conf.high`) which are the lower and upper boundaries of the confidence interval. `conf.level = .95` tells the `tidy()` function to compute a 95% confidence interval.
+
+```{r eval=FALSE}
+tidy(simple_lm_model,
+     conf.int = TRUE,
+     conf.level = .95)
+```
+
+```{r echo=FALSE}
+tidy(simple_lm_model,
+     conf.int = TRUE,
+     conf.level = .95) %>% 
+  rmarkdown::paged_table()
+```
+
+The `glance()` function extracts out the model level statistics like the $r^2$, adjusted $r^2$, test statistic, p value, and degrees of freedom.
+
+```{r eval = FALSE}
+glance(simple_lm_model)
+```
+```{r echo = FALSE}
+glance(simple_lm_model) %>% 
+  rmarkdown::paged_table()
+```
+
+<!-- The model equation can be retrieved using the *equatiomatic* package (note that the coefficients are reported to 2 decimal places and not 3 like the lecture slides). -->
+
+<!-- ```{r warning = FALSE,results= "asis"} -->
+<!-- library(equatiomatic) -->
+<!-- extract_eq(model = simple_lm_model, -->
+<!--            intercept = "beta", -->
+<!--            ital_vars = TRUE, -->
+<!--            use_coefs = TRUE) -->
+<!-- ``` -->
+
+The {QuantPsyc} package has a handy function which can standardize model coefficients, `lm.beta()`.
+
+```{r}
+# get standardized coefficients
+lm.beta(simple_lm_model)
+```
+
+As noted in the lecture slides, the standardized coefficient for a simple regression is identical to the correlation between the DV and the IV.
+
+```{r}
+cor(data_corr$UndergradGPA,
+    data_corr$GradGPA)
+```
+
+
+# Acknowledgements
+
+-   The lovely "DIV TIPS" were made using code from a fantastic blog entry by Desirée de leon at <https://desiree.rbind.io/post/2019/making-tip-boxes-with-bookdown-and-rmarkdown/>
+-   The copy to clipboard buttons were created using Klippy <https://rlesur.github.io/klippy/reference/klippy.html>
+-   The datasauRus was originally created by Alberto Cairo and showcased in his blog post <http://www.thefunctionalart.com/2016/08/download-datasaurus-never-trust-summary.html>
+
+<a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/"><img src="https://i.creativecommons.org/l/by-nc/4.0/88x31.png" alt="Creative Commons License" style="border-width:0"/></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/">Creative Commons Attribution-NonCommercial 4.0 International License</a>.

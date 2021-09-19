@@ -1,0 +1,347 @@
+---
+author: "Mark Christopher Adkins"
+date: '`r paste("Created: 2020-11-11"," Last Modified: ", format(Sys.Date()))`'
+title: 'Correlations'
+output:
+  html_document:
+    toc_float: true
+    number_sections: FALSE
+    toc: true
+    self_contained: true
+    css: "../misc/style.css"
+knit: (function(inputFile, encoding) {
+    rmarkdown::render(inputFile, encoding = encoding, output_dir = here::here("HTML Exercises"))})
+---
+
+```{r setup, include=FALSE}
+# default knitr options
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r klippy, echo=FALSE, include=TRUE}
+# create "copy to clipboard button" for each code chunk
+klippy::klippy(position = c('top', 'right'))
+```
+
+# Correlations
+
+## Load Libraries {.tabset .tabset-fade .tabset-pills}
+
+```{r load_libraries, message=FALSE, warning=FALSE}
+library(psych)     # describeBy()
+library(here)      # here() for relative file paths
+library(ppcor)     # partial and semi-partial correlations
+library(tidyverse)
+```
+
+::: {.fyi}
+If you have trouble installing the {tidyverse} package, you can install/load the individual packages that we need.
+
+```{r eval=FALSE}
+library(dplyr)   # mutate()
+library(tidyr)   # pivot_longer()
+library(ggplot2) # plotting
+library(readr)   # importing csv
+```
+:::
+
+This exercise is a bit different. We are going to start with a puzzle before we learn about correlations using 'R'.
+
+### Puzzle
+
+::: {.puzzle}
+
+Use the following table of descriptive statistics and histograms to predict/describe what you think the relationship between `x` and `y` would look like in a scatterplot.
+
+```{r message=FALSE, echo = FALSE, warning=FALSE}
+data_dino <- datasauRus::datasaurus_dozen %>% 
+  filter(dataset == "dino") %>% 
+  dplyr::select(-dataset)
+```
+
+#### Descriptive Statistics
+
+```{r message=FALSE, echo = FALSE, warning=FALSE}
+data_dino %>% 
+  describe() %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "Variable") %>%  
+  dplyr::select(-vars,-mad,-range,-se) %>% 
+  mutate(across(-Variable, .fns = round, digits = 2)) %>% 
+  rmarkdown::paged_table()
+```
+
+#### Histograms for 'x' and 'y'
+
+```{r message=FALSE, echo = FALSE, warning=FALSE}
+# convert the data to long format, and then ...
+# attach the prefix of "Variable" to the values of variable, and then ...
+# create a faceted histogram
+
+data_dino %>% 
+  pivot_longer(cols = everything(),
+               names_to = "variable",
+               values_to = "value") %>% 
+  mutate(variable = glue::glue("Variable '{variable}'")) %>% 
+  ggplot(aes(x = value)) +
+  geom_histogram(fill = "royalblue",
+                 color = "black") +
+  labs(y = "Count", x = "Values", title = "Distribution of the variables 'x' and 'y'") +
+  facet_grid(~variable) +
+  theme(plot.title = element_text(hjust = .5,
+                                  face = "bold"),
+        text = element_text(size = 12))
+```
+
+The question at this point is how would you describe the relationship between 'x' and 'y' without looking at a scatterplot?
+:::
+
+
+### Show Solution
+
+:::puzzle
+
+Not quite what you expected, right? This just serves as an example of why you must always check out the relationship between variables in a graph **BEFORE** you compute a correlation.
+
+The data from this example was from the {datasauRus} package (don't forget to install the package if you want to try this example out on your own).
+
+```{r}
+# load the pacakge to get the access to the data
+library(datasauRus)
+
+# filter the data set for the "dino" values, and then ...
+# generate a scatterplot
+
+datasaurus_dozen %>% 
+  filter(dataset == "dino") %>% 
+  ggplot(aes(x = x, y = y)) +
+  geom_point(size = 4,
+             color = "darkgreen")
+```
+:::
+
+
+## Create/Import Data
+
+As usual, the next step is to either load some data into R or create some data ourselves. For the exercises within this lab, we will load some data from the file "gradgpa.csv" (which should be inside the "data" folder within your R project).
+
+```{r import_data}
+# import data
+data_corr <- read_csv(file = here("data",
+                            "gradgpa.csv"))
+```
+
+## Clean Up the Data {.tabset .tabset-fade .tabset-pills}
+
+For data imported using the *readr* package, you can check whether there were any parsing problems using the `problems()` function.
+
+```{r check_for_problems}
+# check for parsing problems
+# e.g., were there problems forcing a variable to be a certain type
+problems(data_corr)
+```
+
+It is always a good idea to `View()` your data **every** time you import it to ensure that the data look the way you expect. This is especially important if you have never seen the data before.
+
+```{r eval=FALSE}
+# take a peak at the data
+View(data_corr)
+```
+
+```{r echo=FALSE}
+# HTML friendly data display
+rmarkdown::paged_table(data_corr)
+```
+
+Everything looks to be in order with regard to the types of variables in this data set.
+
+## Check Out the Data
+
+Before computing a correlation you should get to know your variables a bit first. A good place to start is to get some basic descriptive statistics and maybe a few plots (especially if you checked out the puzzle at the start of this exercise).
+
+#### Descriptive Statistics
+
+We will use the `describe()` function from the {psych} package to compute descriptive statistics. If you were checking out the variable names after we imported them above, you might have noticed a variable called `ID`. Computing summary statistics for this variable won't tell us much beyond whether there were any missing values, so we can tell *R* to not use it using the `select()` function.
+
+```{r eval=FALSE}
+# compute descriptive statistics for the data set
+data_corr %>% 
+  select(-ID) %>% 
+  describe()
+```
+
+```{r echo=FALSE}
+# compute descriptive statistics for the data set
+data_corr %>% 
+  dplyr::select(-ID) %>% 
+  describe()
+```
+
+### Check For Outliers
+
+#### Box Plots
+
+A box plot is one way to visually assess the distribution of a variable. A few things to look for when assessing a distribution for normality:
+
+-   The median is centred within the box (the inter-quartile)
+-   There are no outliers
+  -   I colored the outliers red to make them stand out easier (if there are any at all)
+-   Both whiskers extend an appropriate amount beyond the upper and lower edges of the box.
+
+There are five variables of interest in this data set, but for the sake of brevity I will only show the process for checking the correlation between `UndergradGPA` and `GradGPA`.
+
+We could either create two seperate boxplots using code found in previous exercises, but today I want to tie together a few concepts we have used so far in this course.
+
+I followed these steps to create the graph below:
+
+  1. Start with a data.frame/tibble
+  2. Create a subset of the variables I want to explore further
+  3. Convert the subset of data into long format so that all GPA values are in a single column (`GPA`) and the level of education is in another column (`edu_level`)
+  4. Use the mutate() function to change the values in newly created `edu_level` variable into values that will look better on the boxplot
+  5. Create a new ggplot() and add a geom_boxplot() layer  
+    a.  Fill each boxplot using the `edu_level`  
+    b.  Fill any outliers the color red to make them stand out  
+  6. Remove the label from the x-axis as it is redundant and add a main title
+  7. Remove the legend as it is also redundant
+  8. Enlarge all text in the graph to size 12pt, then center and boldface the main title
+
+```{r eval=FALSE}
+# create a subset of variables we want to explore, and then ...
+# convert to long format so that all GPA values are in a single column, and then ...
+# Fix the names for better graphing, and then ...
+# create a boxplot with the following feature:
+# - enlarged text 
+# - center and bold the title
+# - removed the legend
+# - removed the x-axis title and added a main title
+
+data_corr %>%
+  select(UndergradGPA,GradGPA) %>% 
+  pivot_longer(cols = everything(),
+               names_to = "edu_level",
+               values_to = "GPA") %>% 
+  mutate(edu_level = case_when(
+    edu_level == "GradGPA" ~ "Graduate",
+    edu_level == "UndergradGPA" ~ "Undergraduate",
+    TRUE ~ edu_level)) %>% 
+  ggplot(aes(x = edu_level,
+             y = GPA)) +
+  geom_boxplot(aes(fill = edu_level),
+               outlier.fill = "red") +
+  labs(x = "",
+       title = "Distribution of Graduate and Undergraduate Grade Point Averages") +
+  guides(fill = FALSE) +
+  theme(text = element_text(size = 12),
+        plot.title = element_text(hjust = .5, face = "bold"))
+```
+```{r echo=FALSE}
+# create a subset of variables we want to explore, and then ...
+# convert to long format so that all GPA values are in a single column, and then ...
+# Fix the names for better graphing, and then ...
+# create a boxplot with the following feature:
+# - enlarged text 
+# - center and bold the title
+# - removed the legend
+# - removed the x-axis title and added a main title
+
+data_corr %>%
+  dplyr::select(UndergradGPA,GradGPA) %>% 
+  pivot_longer(cols = everything(),
+               names_to = "edu_level",
+               values_to = "GPA") %>% 
+  mutate(edu_level = case_when(
+    edu_level == "GradGPA" ~ "Graduate",
+    edu_level == "UndergradGPA" ~ "Undergraduate",
+    TRUE ~ edu_level)) %>% 
+  ggplot(aes(x = edu_level,
+             y = GPA)) +
+  geom_boxplot(aes(fill = edu_level),
+               outlier.fill = "red") +
+  labs(x = "",
+       title = "Distribution of Graduate and Undergraduate Grade Point Averages") +
+  guides(fill = FALSE) +
+  theme(text = element_text(size = 12),
+        plot.title = element_text(hjust = .5, face = "bold"))
+```
+
+The plot above does not show the presence of any outliers for either variable.
+
+### Linearity Between the Variables
+
+It is important to check that the relationship is approximately linear between the variables. To do this we can construct a scatterplot using each of our two variables of interest on each axis. To help assess whether the relationship is approximately linear, a line showing the relationship can be added as another layer on this plot.
+
+```{r}
+# Use the original dataset and create a scatter plot with a "best-fitting" line
+data_corr %>% 
+ggplot(aes(x = UndergradGPA,
+           y = GradGPA)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+Overall, the line seems to be doing a pretty good job in terms of representing the relationship between `UndergradGPA` and `GradGPA`.
+
+## Compute Bivariate Correlation
+
+Base *R* has a function for computing correlations (i.e., Pearson Product-Moment Correlations), `cor()`. It can accept either two continuous variables, or a whole data.frame/tibble.
+
+```{r eval=FALSE}
+# compute a correlation between two variables, and then ...
+# round all values to 2 digits
+data_corr %>% 
+  select(UndergradGPA,GradGPA) %>% 
+  cor() %>% 
+  round(digits = 2)
+```
+
+```{r echo=FALSE}
+# compute a correlation between two variables
+data_corr %>% 
+  dplyr::select(UndergradGPA,GradGPA) %>% 
+  cor() %>% 
+  round(digits = 2) %>% 
+  as.data.frame() %>% 
+  rmarkdown::paged_table()
+```
+
+:::fyi
+You can alter the code above to compute the correlations among all of the variables in the data.frame/tibble by removing the `select()` function.
+:::
+
+:::note
+If you are computing a correlation matrix, then you MUST first check all of the relationships visually for outliers and linearity.
+:::
+
+## Compute a Partial Correlation
+
+When computing a partial correlation you want to keep in mind which relationship you are interested in examining/testing. The relationship of interest is always between the variables *x* and *y* while controlling for the effect which a third variable (z) has on both of them.
+
+So the following code tests the partial correlation between `UndergradGPA` and `GREQuant` while controlling for the effeect which `GradGPA` might have on both.
+
+```{r}
+# partial correlation
+pcor.test(x = data_corr$UndergradGPA,
+          y = data_corr$GREQuant,
+          z = data_corr$GradGPA)
+```
+
+## Compute a Semi-Partial Correlation
+
+When computing a semi-partial correlation you want to keep in mind which relationship you are interested in examining/testing. The relationship of interest is always between the variables *x* and *y* while controlling for the effect which a third variable (z) has on **only** *x*.
+
+So the following code tests the partial correlation between `UndergradGPA` and `GREQuant` while controlling for the effect which `GradGPA` might have on both.
+
+```{r}
+# partial correlation
+spcor.test(x = data_corr$UndergradGPA,
+          y = data_corr$GREQuant,
+          z = data_corr$GradGPA)
+```
+
+# Acknowledgements
+
+-   The lovely "DIV TIPS" were made using code from a fantastic blog entry by Desirée de leon at <https://desiree.rbind.io/post/2019/making-tip-boxes-with-bookdown-and-rmarkdown/>
+-   The copy to clipboard buttons were created using Klippy <https://rlesur.github.io/klippy/reference/klippy.html>
+-   The datasauRus was originally created by Alberto Cairo and showcased in his blog post <http://www.thefunctionalart.com/2016/08/download-datasaurus-never-trust-summary.html>
+
+<a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/"><img src="https://i.creativecommons.org/l/by-nc/4.0/88x31.png" alt="Creative Commons License" style="border-width:0"/></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/">Creative Commons Attribution-NonCommercial 4.0 International License</a>.

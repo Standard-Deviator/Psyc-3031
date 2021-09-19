@@ -1,0 +1,266 @@
+---
+author: "Mark Christopher Adkins"
+date: '`r paste("Created: 2020-09-11"," Last Modified: ", format(Sys.Date()))`'
+title: 'ANOVA Oneway'
+output:
+  html_document:
+    toc_float: true
+    number_sections: FALSE
+    toc: true
+    self_contained: true
+    css: "../misc/style.css"
+knit: (function(inputFile, encoding) {
+    rmarkdown::render(inputFile, encoding = encoding, output_dir = here::here("HTML Exercises"))})
+---
+
+```{r setup, include=FALSE}
+# default knitr options
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r klippy, echo=FALSE, include=TRUE}
+# create "copy to clipboard button" for each code chunk
+klippy::klippy(position = c('top', 'right'))
+```
+
+# ANOVA - Independent Samples
+
+## Load Libraries
+
+```{r load_libraries, message=FALSE, warning=FALSE}
+library(car)     # leveneTest()
+library(psych)   # describeBy()
+library(ez)      # ezANOVA()
+library(here)
+library(tidyverse)
+```
+
+::: {.fyi}
+If you have trouble installing the tidyverse package, you can install/load the individual packages that we need.
+
+```{r eval=FALSE}
+library(dplyr)   # mutate()
+library(forcats) # fct_recode()
+library(ggplot2) # plotting
+library(readr)   # importing csv
+```
+:::
+
+## Create/Import Data {.tabset .tabset-fade .tabset-pills}
+
+The next step is to either load some data into R or create some data ourselves. For the exercises within this lab, we will load some data from the file "speed_data.csv" (which should be inside the "data" folder within your R project).
+
+```{r import_data}
+# import data and force the read_csv() function to make
+# the variables into certain types
+data_ANOVA <- read_csv(file = here("data",
+                            "speed_data.csv"))
+```
+
+### Puzzle
+
+::: {.puzzle}
+If you know the type of data you want your variables to be imported as, you can also use the `col_types` argument. You need to use a new function `cols()`. Inside, you write the name of the variable (as it exists in your .csv file) followed by `=` and a single character indicating the variable type.
+
+-   "c" = character
+-   "i" = integer
+-   "n" = numeric
+-   "f" = factor
+
+You can check out the help documentation to find out other shortcodes for variables.
+
+Try to get the `read_csv()` function to convert *id*, and *wording* into a factor, while leaving the *estimate* variable as a double.
+
+```{r import_data_specs, eval=FALSE}
+# import data and force the read_csv() function to make
+# the variables into certain types
+data_ANOVA <- read_csv(
+      file = here("data",
+           "speed_data.csv"),
+      col_types = cols(<YOUR CODE HERE>,
+                       <YOUR CODE HERE>,
+                       <YOUR CODE HERE>))
+```
+
+Note: if you provide `col_types` when you import the data, then you won't be given the feedback of the column specifications.
+:::
+
+### Show Solution
+
+::: {.puzzle}
+```{r eval=FALSE}
+# import data and force the read_csv() function to make
+# the variables into certain types
+data_ANOVA <- read_csv(
+      file = here("data",
+           "speed_data.csv"),
+      col_types = cols(id = "f",
+                       estimate = "d",
+                       wording = "f"))
+```
+:::
+
+## Clean Up the Data
+
+For data imported using the {readr} package, you can check whether there were any parsing problems using the `problems()` function.
+
+```{r check_for_problems}
+# check for parsing problems
+# e.g., were there problems forcing a variable to be a certain type
+problems(data_ANOVA)
+```
+
+Next, let's `fct_recode()` the *wording* variable to have more meaningful levels.
+
+```{r recode_factor}
+# convert "wording" to a factor and recode the levels
+data_ANOVA <- data_ANOVA %>% 
+  mutate(wording = as.character(wording),
+         wording = fct_recode(wording,
+                              "Accident" = "1",
+                              "Hit" = "2",
+                              "Smashed" = "3"))
+```
+
+## Check Assumptions
+
+### Normality in **Each** Group
+
+#### QQ-Plots
+
+A quantile-quantile (qq-plot) is one way to visually assess whether a variable is approximately normally distributed. If each variable were normally distributed, then the points would fall exactly on the line.
+
+To construct a qq-plot using the {ggplot2} package, begin by passing our data.frame/tibble to the `ggplot()` function and map the variable *estimate* to the *sample* aesthetic. Next add a layer of points (using `geom_qq()`) and the quantile line (using `geom_qq_line()`). The final step for assessing the distribution of recall scores across both groups is to create a panel for each group using the `facet_grid()` function.
+
+```{r}
+# assess normality using a qqplot
+# - for qqplot you need to use an aesthetic called "sample"
+ggplot(data_ANOVA, aes(sample = estimate)) +
+    geom_qq() +
+    geom_qq_line() +
+    facet_grid(~wording)
+```
+
+::: {.fyi}
+If you want to create panels of plots, `facet_grid()` has a way to specify that the panels should be displayed as columns or rows (or both if you use two variables). You can write your code like this: `facet_grid(row~column)`. Where *row* is the name of the variable you want to create a row of panels for, while *column* is the name of the variable you want to create a column of panels for. You can leave either one blank if you are only using one variable.
+
+For instance, `facet_grid(~wording)` uses each value of group to create a column of plots.
+:::
+
+#### Box Plots
+
+A box plot is another way to visually assess the distribution of a variable. A few things to look for when assessing a distribution for normality:  
+
+* The median is centred within the box (the inter-quartile)  
+* There are no outliers 
+* Both whiskers extend an appropriate amount beyond the upper and lower edges of the box.
+
+```{r}
+# create a box plot to show "recall" distribution for each group
+ggplot(data_ANOVA, aes(x = wording, y = estimate)) +
+    geom_boxplot()
+```
+
+#### Using Descriptive Statistics
+
+In past exercises, we have used the `describe()` function to compute descriptive statistics. Today, we will use a related function from the {psych} package called `describeBy()` (note the capital "B"). This will break your data set into groups, and compute descriptive statistics separately for each group.
+
+This function needs two vectors; one vector which you want descriptive statistics for, and one vector which tells the function how to subset your data first.
+
+```{r}
+# assess normality using descriptive statistics
+describeBy(x = data_ANOVA$estimate,
+           group = data_ANOVA$wording)
+```
+
+### Homogeneity of Variance
+
+Levene's test can be used to assess for violations of homogeneity of variance. The {EZ} package conducts Levene's test along with the ANOVA. See output below (in conduct test section).
+
+## Effect Size
+
+For an independent samples ANOVA, one recommended effect size which should be reported and interpreted is generalized eta-squared, $\eta_G^2$. When you conduct the independent samples ANOVA using the `ezANOVA()` function, $\eta_G^2$ is computed for you (though the function labels the output as *ges*).
+
+## Conduct Test
+
+We will use the the {EZ} package to conduct our ANOVA test (and Levene's test). Specifically, we will use the `ezANOVA()` function because it can be used conduct a variety of ANOVA tests, so once we learn this function it will help us later on as well. To conduct an independent samples ANOVA you need to specify four arguments:
+
+-   *data* - the data.frame/tibble where you data "lives"
+
+-   *wid* - a variable with a unique subject id for each subject
+
+    -   if the variable you supply to the *wid* argument is not a factor, the function will temporarily convert it for you
+
+-   *between* - a variable containing grouping information
+
+-   *dv* - the outcome variable
+
+We will also add one more argument to make it easier to conduct our post-hoc tests later, *return_aov*.
+
+```{r}
+# conduct an independent samples ANOVA
+# then save the results into an object
+ANOVA_results <- ezANOVA(data = data_ANOVA,
+        wid = id,
+        between = wording,
+        dv = estimate,
+        return_aov = TRUE)
+```
+
+::: {.fyi}
+If you are unsure what some of the values in the `ezANOVA()` output are referring to, then check the help documentation in the *Value* section. You can open the help documentation using the following code.
+
+```{r eval=FALSE}
+?ez::ezANOVA
+```
+:::
+
+```{r}
+# Check the results from Levene's test
+ANOVA_results$`Levene's Test for Homogeneity of Variance`
+```
+
+::: {.note}
+Be sure to ALWAYS always check the results of Levene's test PRIOR to checking the ANOVA results because if there was a problem with heterogeneity of variances then you can't trust the *p*-value form the ANOVA.
+:::
+
+```{r}
+# Check the results from the ANOVA test
+ANOVA_results$ANOVA
+```
+
+## Post-Hoc Tests
+
+To conduct Tukey's post-hoc test on the differences between group means, we will use the `TukeyHSD()` function and pass it the results from our *ANOVA_results* object.
+
+```{r}
+# conduct Tukey's post-hoc tests using the aov (ANOVA) object from our ANOVA_results
+TukeyHSD(x = ANOVA_results$aov)
+```
+
+# Welch Test
+
+To conduct the Welch test, we can use a function from the {stats} package (which comes pre-installed and pre-loaded with R), `oneway.test()`.
+
+```{r}
+# conduct Welch independent samples ANOVA
+oneway.test(formula = estimate~wording,
+            data = data_ANOVA,
+            var.equal = FALSE)
+```
+
+# Kruskal-Wallis Rank Sum Test
+
+If the DV is heavily skewed or ordinal, then a traditional ANOVA is not appropriate. A Kruskal-Wallis rank sum test would be better because it does not have the same distributional (normality) assumption. It does have an additional assumption that the distribution of the DV in each group is roughly the same (e.g., they all have about the same degree of positive skew etc.)
+
+```{r}
+kruskal.test(formula = estimate~wording,
+             data = data_ANOVA)
+```
+
+# Acknowledgements
+
+-   The lovely "DIV TIPS" were made using code from a fantastic blog entry by Desirée de leon at <https://desiree.rbind.io/post/2019/making-tip-boxes-with-bookdown-and-rmarkdown/>
+-   The copy to clipboard buttons were created using Klippy <https://rlesur.github.io/klippy/reference/klippy.html>
+
+<a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/"><img src="https://i.creativecommons.org/l/by-nc/4.0/88x31.png" alt="Creative Commons License" style="border-width:0"/></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/">Creative Commons Attribution-NonCommercial 4.0 International License</a>.

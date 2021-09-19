@@ -1,0 +1,390 @@
+---
+author: "Mark Christopher Adkins"
+date: '`r paste("Created: 2020-09-11"," Last Modified: ", format(Sys.Date()))`'
+title: 'Multiple Regression'
+output:
+  html_document:
+    toc_float: true
+    number_sections: FALSE
+    toc: true
+    self_contained: true
+    css: "../misc/style.css"
+knit: (function(inputFile, encoding) {
+    rmarkdown::render(inputFile, encoding = encoding, output_dir = here::here("HTML Exercises"))})
+---
+
+```{r setup, include=FALSE}
+# default knitr options
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r klippy, echo=FALSE, include=TRUE}
+# create "copy to clipboard button" for each code chunk
+klippy::klippy(position = c('top', 'right'))
+```
+
+# Multiple Regression
+
+## Load Libraries
+
+```{r load_libraries, message=FALSE, warning=FALSE}
+library(QuantPsyc) # lm.beta()
+library(car)       # durbinWatsonTest(), vif()
+library(broom)     # tidy(), glance(), augment()
+library(psych)     # describeBy()
+library(here)
+library(tidyverse)
+```
+
+::: {.fyi}
+If you have trouble installing the tidyverse package, you can install/load the individual packages that we need.
+
+```{r eval=FALSE}
+library(dplyr)   # mutate()
+library(ggplot2) # plotting
+library(readr)   # importing csv
+```
+:::
+
+## Create/Import Data
+
+The next step is to either load some data into R or create some data ourselves. For the exercises within this lab, we will load some data from the file "gradgpa.csv" (which should be inside the "data" folder within your R project).
+
+```{r import_data}
+# import data and force the read_csv() function to make
+# the variables into certain types
+data_lm <- read_csv(file = here("data",
+                                "gradgpa.csv"))
+```
+
+## Clean Up the Data {.tabset .tabset-fade .tabset-pills}
+
+For data imported using the *readr* package, you can check whether there were any parsing problems using the `problems()` function.
+
+```{r check_for_problems}
+# check for parsing problems
+# e.g., were there problems forcing a variable to be a certain type
+problems(data_lm)
+```
+
+It is always a good idea to `View()` your data **every** time you import it to ensure that the data look the way expect. This is especially important if you have never seen the data before.
+
+```{r eval=FALSE}
+# take a peak at the data
+View(data_lm)
+```
+
+```{r echo=FALSE}
+# HTML friendly data display
+rmarkdown::paged_table(data_lm)
+```
+
+Everything looks to be in order with regard to the types of variables in this data set.
+
+## Fit a Multiple Regression Model
+
+To fit a regression model in *R* (either simple or multiple) we can use the `lm()` function from base *R*.
+
+There are at least two function arguments needed to fit a regression model: *formula*, and *data*.
+
+We have used formulas already in past exercises, but here is a bit of a recap.
+
+-   Formulas have a left-hand side (LHS) and a right-hand side (RHS) separated by a tilde (\~).
+-   The LHS is for the dependent variable (DV)
+-   The RHS is for the independent variables (IVs) and their interactions.
+
+A multiple regression model has one continuous DV and more than one IV (IVs can be any combination of continuous and discrete variables).
+
+Let's try to regress `GradGPA` (the DV) onto `UndergradGPA`, `GREVerbal`, `GREQuant`, and `Interview` (the IVs). Right now, our multiple regression does not have any interactions.
+
+```{r}
+multiple_lm_model <- lm(formula = GradGPA ~ UndergradGPA + GREVerbal + GREQuant + Interview,
+                        data = data_lm)
+```
+
+::: {.fyi}
+*R* has some built in diagnostic plots which you can access by using the `plot()` function on your regression model. You have to press [ENTER] in the console pane to produce the next graph in the sequence.
+
+```{r eval = FALSE}
+# creates a sequence of four diagnostics plots
+plot(multiple_lm_model)
+```
+:::
+
+## Check Assumptions
+
+Assumptions for multiple regression might feel a bit different than the other statistical tests we have done so far. One main difference is that we have to first fit our regression model in order to get the necessary information needed to check the assumptions.
+
+### Augmenting our Data.Frame
+
+There are a few functions which can help with conducting diagnostic tests for a multiple regression model.
+
+One function in particular is the `augment()` function from the {broom} package. This function takes your regression model and extracts many useful values which can be used to diagnose your model for problems. These values are added to the right side of your data.frame/tibble. As a final step we are also going to add a new column of studentized residuals to our data frame using the `rstudent()` function from the stats package (which comes installed and loaded automatically by RStudio).
+
+```{r}
+# augment our existing data.frame/tibble with model diagnostic data
+data_lm_diag <- augment(x = multiple_lm_model,
+                        data = data_lm) %>% 
+  add_column(.stud.resid = rstudent(multiple_lm_model))
+```
+
+### MLR --Linear Relationship
+
+One place to start checking the linearity of each predictor in relation to the DV is to construct a series of scatterplots.
+
+We can use the {ggplot2} package to create scatterplots in our usual way. Conventionally, the DV is placed on the y-axis.
+
+The first predictor we will look at is `UndergradGPA`.
+
+```{r}
+data_lm_diag %>% 
+  ggplot(aes(x = UndergradGPA, y = GradGPA)) +
+  geom_point()
+```
+
+Overall, this relationship looks linear (i.e., a straight line is a reasonable approximation for the relationship).
+
+Here are all four of the predictors plotted together against `GradGPA` as a series of scatterplots.
+
+```{r echo=FALSE}
+library(patchwork)
+p1 <- data_lm_diag %>% 
+  ggplot(aes(y = GradGPA, x = UndergradGPA)) +
+  geom_point()
+
+p2 <- data_lm_diag %>% 
+  ggplot(aes(y = GradGPA, x = GREVerbal)) +
+  geom_point()
+
+p3 <- data_lm_diag %>% 
+  ggplot(aes(y = GradGPA, x = GREQuant)) +
+  geom_point()
+
+p4 <- data_lm_diag %>% 
+  ggplot(aes(y = GradGPA, x = Interview)) +
+  geom_point()
+
+(p1 + p2) / (p3 + p4)
+```
+
+::: {.fyi}
+If you are interested in how to put a series of plots into a single plot (like the one above), then I recommend checking out the patchwork package at <https://github.com/thomasp85/patchwork>.
+
+It should be noted that putting diagnostic plots together like this is overkill. Usually, you would only put together a set of more "polished" or finished plots which you want your reader to consider together.
+:::
+
+### MLR - Correlations
+
+We can compute correlations between all of the variables in our model (the DV and the IVs) using the following code.
+
+We can examine the first column of correlations to see how each of our predictors correlate with the DV. We can also check out the rest of the correlation matrix showing how each of the IVs correlates with all of the other IVs in our model.
+
+```{r eval= FALSE}
+data_lm_diag %>% 
+  select(GradGPA,UndergradGPA,GREVerbal,GREQuant,Interview) %>% 
+  cor() %>% 
+  round(digits = 2)
+```
+
+```{r echo= FALSE}
+data_lm_diag %>% 
+  dplyr::select(GradGPA,UndergradGPA,GREVerbal,GREQuant,Interview) %>% 
+  cor() %>%
+  round(digits = 2) %>%
+  as.data.frame() %>% 
+  rmarkdown::paged_table()
+```
+
+::: {.fyi}
+The `select()` function has a neat trick it can do. The order in which you specify the variables to keep is also the order they will appear in the subset it creates. Using this trick, I was able to recreate the table from the lecture slides by putting the model DV (`GradGPA`) first, followed by the IVs.
+:::
+
+### MLR --Linearity and Homoscedasticity {.tabset .tabset-fade .tabset-pills}
+
+Base *R* has a few handy ways of creating "quick and dirty" model diagnostic plots. The `plot()` function will create a series of four diagnostic plots. To assess homoscedasticity by itself (instead of all four plots), we can supply another argument, `which = 1`, to tell the `plot()` function that we only want the first plot.
+
+If the assumption of homogeneity of variance and linearity were met, all of the model residuals should be scattered more or less evenly around the horizontal line at a residual value of 0.00. The smooth line highlights the general pattern the residuals are following.
+
+```{r}
+# plot the fitted values againt the residual values
+plot(multiple_lm_model,which = 1)
+```
+
+#### Puzzle
+
+::: {.puzzle}
+Try using our augmented data.frame/tibble to recreate this diagnostic plot (don't worry about the access labels or titles).
+:::
+
+#### Show Solution
+
+::: {.puzzle}
+```{r}
+data_lm_diag %>% 
+  ggplot(aes(y = .resid, x = .fitted)) +
+  geom_point() +
+  geom_smooth(se=FALSE,color = "red") +
+  geom_hline(yintercept = 0, linetype = 2) +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 10))
+```
+:::
+
+### Normality of the Residuals
+
+#### Histogram
+
+A good place to start assessing the assumption of normality is to create a histogram of model residuals.
+
+```{r}
+# create a histogram to check the distribution of the standardized residuals
+# The number of bins was set to 8, and the center of each "bin" was shifted to match the lecture slides
+data_lm_diag %>% 
+  ggplot(mapping = aes(x = .std.resid)) +
+  geom_histogram(fill = "royalblue",
+                 color="black",
+                 bins = 8,
+                 center=-.25)
+```
+
+
+#### QQ-Plots
+
+A quantile-quantile (qq-plot) is one way to visually assess whether a variable is approximately normally distributed. If each variable were normally distributed, then the points would fall exactly on the line. In the context of a multiple regression, we want to construct a qq-plot of the model residuals.
+
+To construct a qq-plot using the {ggplot2} package, begin by passing our data.frame/tibble to the `ggplot()` function and map the variable *quality* to the *sample* aesthetic. Next add a layer of points (using `geom_qq()`) and the quantile line (using `geom_qq_line()`).
+
+```{r}
+# assess normality using a qqplot
+# - for qqplot you need to use an aesthetic called "sample"
+data_lm_diag %>% 
+ggplot(mapping = aes(sample = .std.resid)) +
+    geom_qq() +
+    geom_qq_line() 
+```
+
+::: {.fyi}
+You also use the plot function to see a qq-plot using your multiple regression model.
+
+```{r eval=FALSE}
+plot(multiple_lm_model,which = 2) 
+```
+:::
+
+### MLR - Multicollinearity
+
+To check if multicollinearity is a problem for a multiple regression, you can use the `vif()` function from the {car} package. It returns the variance inflation factors for each of the IVs in your model.
+
+```{r}
+vif(multiple_lm_model)
+```
+
+### MLR - Indpendent Errors
+
+A good way to assess the independence of the model residuals is to conduct a Durbin-Watson test. The {car} package has a nice function which can conduct the test for us, `durbinWatsonTest()`. The value of the test statistics ("D-W Statistic") should be somewhere in the range of 1 to 3 to indicate that the model residuals do not show much evidence that the assumption of independence was violated.
+
+```{r}
+# check for the independence of model residuals
+durbinWatsonTest(multiple_lm_model)
+```
+
+### MLR - Outliers and Influential Cases
+
+It is very important to check that there are no extreme outliers or influential cases. The presence of outliers or influential cases can greatly bias the model coefficients and the standard errors associated with those estimates.
+
+You should investigate outliers and influential cases the same way we check any variable we are working with by computing both descriptive statistics and visualizations of the data.
+
+```{r eval=FALSE}
+# get descriptive stats for outliers and influential cases
+data_lm_diag %>% 
+  select(.stud.resid,.cooksd,.hat) %>% 
+  describe() %>% 
+  round(digits = 2)
+```
+
+```{r echo=FALSE}
+# get descriptive stats for outliers and influential cases
+data_lm_diag %>% 
+  dplyr::select(.stud.resid,.cooksd,.hat) %>% 
+  describe() %>%
+  round(digits = 2) %>% 
+  rmarkdown::paged_table()
+```
+
+Next, we are going to construct an index plot (which is kind of like a scatterplot except on the x-axis is the case or id number for each subject). Remember, that the order of case or id values usually don't have much meaning to us, so these kinds of plots are meant to highlight another variable on the y-axis and we should not interpret these scatterplots as showing a relationship.
+
+```{r}
+# index plot of leverage
+data_lm_diag %>% 
+  ggplot(aes(x = ID, y = .hat)) +
+  geom_point()
+```
+
+```{r}
+# index plot of studentized residuals or discrepency
+data_lm_diag %>% 
+  ggplot(aes(x = ID, y = .stud.resid)) +
+  geom_point()
+```
+
+```{r}
+# index plot of influential cases
+data_lm_diag %>% 
+  ggplot(aes(x = ID, y = .cooksd)) +
+  geom_point()
+```
+
+
+
+
+## Check Results
+
+After you have checked your assumptions, it is time to (finally) check on the results of your multiple regression model.
+
+We can check the results from our multiple regression model using the `summary()` function on our results object (`multiple_lm_model`).
+
+```{r}
+# check the results of the multiple regression model
+summary(multiple_lm_model)
+```
+
+If you want to get the results from our regression model into a tibble, you can use the `tidy()` and `glance()` functions from the {broom} package.
+
+The `tidy()` function extracts the estimates for the intercepts and regression coefficients, their test statistics, standard error, and p values. You can also set `conf.int = TRUE` to get confidence intervals around the intercept and regression coefficients. This will add two new columns (`conf.low` and `conf.high`) which are the lower and upper boundaries of the confidence interval. `conf.level = .95` tells the `tidy()` function to compute a 95% confidence interval.
+
+```{r eval=FALSE}
+tidy(multiple_lm_model,
+     conf.int = TRUE,
+     conf.level = .95)
+```
+
+```{r echo=FALSE}
+tidy(multiple_lm_model,
+     conf.int = TRUE,
+     conf.level = .95) %>% 
+  rmarkdown::paged_table()
+```
+
+The `glance()` function extracts out the model level statistics like the $R^2$, adjusted $R^2$, test statistic, p value, and degrees of freedom.
+
+```{r eval = FALSE}
+glance(multiple_lm_model)
+```
+
+```{r echo = FALSE}
+glance(multiple_lm_model) %>% 
+  rmarkdown::paged_table()
+```
+
+The {QuantPsyc} package has a handy function which can standardize model coefficients, `lm.beta()`.
+
+```{r}
+# get standardized coefficients
+lm.beta(multiple_lm_model)
+```
+
+# Acknowledgements
+
+-   The lovely "DIV TIPS" were made using code from a fantastic blog entry by Desirée de leon at <https://desiree.rbind.io/post/2019/making-tip-boxes-with-bookdown-and-rmarkdown/>
+-   The copy to clipboard buttons were created using Klippy <https://rlesur.github.io/klippy/reference/klippy.html>
+
+<a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/"><img src="https://i.creativecommons.org/l/by-nc/4.0/88x31.png" alt="Creative Commons License" style="border-width:0"/></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/">Creative Commons Attribution-NonCommercial 4.0 International License</a>.

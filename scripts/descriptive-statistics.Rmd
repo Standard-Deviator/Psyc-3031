@@ -1,0 +1,429 @@
+---
+author: "Mark Christopher Adkins"
+date: '`r paste("Created: 2020-09-06"," Last Modified: ", format(Sys.Date()))`'
+title: 'Descriptive Statistics'
+output:
+  html_document:
+    toc_float: true
+    number_sections: FALSE
+    toc: true
+    self_contained: true
+    css: "../misc/style.css"
+knit: (function(inputFile, encoding) {
+    rmarkdown::render(inputFile, encoding = encoding, output_dir = here::here("HTML Exercises"))})
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r klippy, echo=FALSE, include=TRUE}
+klippy::klippy(position = c('top', 'right'))
+```
+
+# Load libraries
+
+When writing a new script file, there are two things you put at the top of the script.
+
+  1. A comment describing the purpose of the script. In R, a comment is always preceded by a `#`. This distinguishes a comment from actual code.
+  2. All of your `library()` functions which load the packages which are needed to run your script.
+
+```{r message=FALSE, warning = FALSE}
+# Week 3 Exercises: practice computing descriptive statistics and plots
+
+library(psych)     # load psych package for
+                   # descriptive stats
+library(tidyverse) # load packages for importing,
+                   # cleaning, and plotting data
+```
+
+:::fyi
+If you have trouble installing the {tidyverse} package, you can install/load the individual packages that we need.
+```{r eval=FALSE}
+library(readr)   # import csv files
+library(dplyr)   # for easier subsetting and
+                 # data manipulation
+library(forcats) # create/mutate factors easier
+library(ggplot2) # graphics
+```
+:::
+
+
+
+# Import Data
+
+When you import data into R, it creates a copy of your data. This is a good thing because whatever changes you make to your data will **NOT** affect the data on your computer. You can always just re-import your data if you make a mistake.
+
+## The {here} Package
+
+The only tricky part about importing data is telling R where the file "lives". There are many ways to specify a filepath (where the file lives), but my preference is to use another package called {here}.
+
+```{r eval=FALSE}
+install.packages("here")
+```
+
+Don't forget to load the package at the top of your script.
+
+```{r include=FALSE}
+library(here)
+```
+```{r eval=FALSE}
+library(here)
+```
+
+:::note
+The code to install the {here} package should **NOT** be included in your script file. Remember, installing R packages is a one-time process. It doesn't need to be repeated every time you run your script. On the other hand, loading the {here} package using `library(here)` DOES need to be included in your script file.
+:::
+
+A message should be printed to the console pane which shows you where R will look for saving or importing your files. When you use an R project with the `here()` function to organize your work it automatically finds the the location of the .rproj file and uses that location for saving and loading files.
+
+For this exercise, we need to tell R that the file we want to load (*Experiment_1.csv*) is inside the *data* folder within our current R project.
+
+We can accomplish this using the `here()` function.
+
+```{r eval=FALSE}
+# This just creates the file path we need to load data into R
+# By itself, this won't load the data. But the location of the file will be printed to the console pane to show you where the file "lives".
+here("data","Experiment_1.csv")
+```
+You can think of this code as telling R to start in the main project folder, then find a sub-folder called *data*, then find a file called *Experiment_1.csv*. Just be sure to list the folders in the correct order with the file name being the last argument inside the function.
+
+:::fyi
+Another great feature about the `here()` function is that regardless of whether you write your code using a MAC or PC, it will properly format the file path so that R can find the files you want.
+:::
+
+Finally, to actually import our data we will use the `read_csv()` function from the {readr} package (this package was installed as part of the tidyverse). The first argument is called *file*, and we need to tell the function where to find the file like this:
+
+```{r}
+data_sugar <- read_csv(file = here("data",
+                                   "Experiment_1.csv"))
+```
+
+:::note
+Use the `read_csv()` function NOT `read.csv()`; either function will work to import your csv file, but the `read_csv()` function has some added benefits and is the function used with the tidyverse.
+:::
+
+
+# Subsetting
+
+## Subset Columns with `select()` {.tabset .tabset-fade .tabset-pills}
+
+The `select()` function is used to select a subset of variables. The first argument is a data frame, then you can specify the names of the variables you want to keep.
+
+```{r eval=FALSE}
+data_sugar_id_sex_age <- select(data_sugar,
+                                id, sex, age)
+```
+```{r echo=FALSE}
+data_sugar_id_sex_age <- dplyr::select(data_sugar,
+                                id, sex, age)
+```
+
+:::fyi
+Sometimes it might be faster to tell the `select()` function which variables to exclude. You can do this by placing a "-" in front of the variable names you want to leave out. For example, if we wanted to omit the age variable but **KEEP** everything else we could write:
+
+```{r eval=FALSE}
+data_sugar_no_age <- select(data_sugar,
+                            -age)
+```
+
+```{r echo=FALSE}
+data_sugar_no_age <- dplyr::select(data_sugar,
+                            -age)
+```
+:::
+
+:::note
+For more information and tips about using `select()`, go to [https://rstudio.cloud/learn/primers/2.2](https://rstudio.cloud/learn/primers/2.2) and find the `select()` section which discuses `select()` helpers.
+:::
+
+### Puzzle
+
+:::puzzle
+Try to use the `select()` helpers to create a subset which only has the "id" column, and all of the variables which start with either "IV" or "DV".
+
+```{r eval=FALSE}
+data_sugar_id_IV_DV <- select(data_sugar,
+                              <YOUR CODE HERE>,
+                              <YOUR CODE HERE>,
+                              <YOUR CODE HERE>)
+```
+:::
+
+### Show Solution
+
+:::puzzle
+You can use the `select()` helper `starts_with()` to select all variables that start with a particular pattern.
+```{r eval=FALSE}
+data_sugar_id_IV_DV <- select(data_sugar,
+                              id,
+                              starts_with("IV"),
+                              starts_with("DV"))
+```
+
+```{r echo=FALSE}
+data_sugar_id_IV_DV <- dplyr::select(data_sugar,
+                              id,
+                              starts_with("IV"),
+                              starts_with("DV"))
+```
+
+:::
+
+## Subset rows with `filter()` {.tabset .tabset-fade .tabset-pills}
+
+The `filter()` function is used to select a subset of participants or observations. The first argument is a data frame, then you can specify the conditions that must be true to **KEEP** certain rows, this code will create a subset of all males
+
+```{r}
+data_sugar_males <- filter(data_sugar,
+                           sex == 1)
+```
+
+:::note
+For more information and tips about using `filter()`, go to [https://rstudio.cloud/learn/primers/2.2](https://rstudio.cloud/learn/primers/2.2) and find the `filter()` section which discuses "Logical tests" and "Boolean Operators".
+:::
+
+### Puzzle
+
+:::puzzle
+Try making a subset of only the male subjects in the first IV_condition.
+```{r eval=FALSE}
+data_sugar_males_cond_1 <- filter(data_sugar,
+                                  <YOUR CODE HERE>)
+```
+:::
+
+### Show Solution
+
+:::puzzle
+
+To create a subset of all male subject, we need to filter for all values of sex exactly equal to 1 (if you check the lecture slides, there is a codebook indicating that male = 1 and female = 2).
+```{r eval=TRUE}
+data_sugar_males_cond_1 <- filter(data_sugar,
+                                  sex == 1)
+```
+:::
+
+# Transform variables using `mutate()` {.tabset .tabset-fade .tabset-pills}
+
+The `mutate()` function is used to create new variables or transform pre-existing variables. The first argument needed for the `mutate()` function is a data frame. Next you set the name for the new variable followed by an "=" and how the new variable should be computed.
+
+:::fyi
+You can learn more about how to use `mutate()` in the "Derive Information with dplyr" primer at [https://rstudio.cloud/learn/primers/2.3](https://rstudio.cloud/learn/primers/2.3).
+:::
+
+In the first example, we will convert the *sex* variable into a factor, then we will change the levels of that factor from digits to something a bit more meaningful.
+
+:::note
+When converting a integer vector into a factor, it is usually necessary to first convert it to a character vector (e.g., the value 1 becomes the character "1")
+:::
+
+```{r}
+data_sugar <- mutate(data_sugar,
+                     sex = as.character(sex),
+                     sex = fct_recode(sex,
+                                      "male" = "1",
+                                      "female" = "2"))
+```
+
+:::fyi
+You can edit an existing variable using the `mutate()` function by using the name of a variable which already exists. R will replace the old variable with the new one which share the same name.
+
+You can also create/edit many variables within the same `mutate()` function, by separating each variable by a ",".
+:::
+
+## Puzzle
+
+:::puzzle
+Using the codebook provided, try out converting the IV_condition variables into a factor with meaningful levels.
+```{r eval=FALSE}
+data_sugar <- mutate(data_sugar,
+            IV_condition = as.character(IV_condition),
+            IV_condition = fct_recode(
+              IV_condition,
+              <YOUR CODE HERE>,
+              <YOUR CODE HERE>,
+              <YOUR CODE HERE>,
+              <YOUR CODE HERE>))
+```
+:::
+
+## Show Solutions
+
+:::puzzle
+```{r}
+data_sugar <- mutate(data_sugar,
+            IV_condition = as.character(IV_condition),
+            IV_condition = fct_recode(
+              IV_condition,
+              'waiter-served, typical' = "1",
+              'waiter-served, bundled' = "2",
+              'self-served, typical' = "3",
+              'self-served, bundled' = "4"))
+```
+:::
+
+# Descriptive Statistics
+
+## Using `describe()` 
+
+Now let's try to get some descriptive statistics for our example data set. One of the quickest ways to get a good variety of summary statistics is to use the `describe()` function from the {psych} package. As you can see from the output below, if you have a lot of variables it can be hard to read the output, so I usually put it inside the `View()` function to see it inside a new tab within RStudio.
+
+:::fyi
+For information on using `View()`, check out the "Tibble" section of the "Working with Tibbles" primer at [https://rstudio.cloud/learn/primers/2.1](https://rstudio.cloud/learn/primers/2.1)
+:::
+
+```{r eval=FALSE}
+# Example of what you would type in RStudio.
+# These results are not shown in this exercise.
+View(describe(data_sugar))
+```
+
+```{r}
+# The results below are the result of this function.
+describe(data_sugar)
+```
+
+:::fyi
+If you want to compute descriptive statistics for a subset of your data set, try to use the `select()` function we used earlier alongside the piping operator, `%>%`. You can learn more about piping operator within the `%>%` section of the "Isolating Data with dplyr" primer at [https://rstudio.cloud/learn/primers/2.2](https://rstudio.cloud/learn/primers/2.2).
+
+```{r eval=FALSE}
+# start with the full data set, and then ...
+# select() the continuous variables you want, and then ...
+# compute descriptive statistics, and then ...
+# View() the results in RStudio.
+data_sugar %>% 
+  select(age,
+         DV_ounces_consumed,
+         DV_calories_consumed) %>% 
+  describe() %>%
+  View()
+```
+:::
+
+Here is a cleaned up peek at the summary generated using the `describe()` function. In the upper right corner is a small black arrow which lets you view the other columns in this summary data set.
+
+```{r echo=FALSE}
+rmarkdown::paged_table(round(describe(data_sugar),3))
+```
+
+## Using `summary()`
+
+It should be noted that using `describe()` on categorical data can often result in non-sensical summary statistics. Using `summary()` can provide a set of counts (which are perhaps the most sensible type of summary statistic for categorical data).
+
+```{r eval=FALSE}
+# Start with the full data set, and then ...
+# select() all of the categorical data (factors), and then ...
+# summarize the data.
+data_sugar %>% 
+  select(IV_condition,
+         sex) %>% 
+  summary()
+```
+
+```{r echo=FALSE}
+# Start with the full data set, and then ...
+# select() all of the categorical data (factors), and then ...
+# summarize the data.
+data_sugar %>% 
+  dplyr::select(IV_condition,
+         sex) %>% 
+  summary()
+```
+
+# Descriptive Plots
+
+We can use the {ggplot} package to generate some highly customizable plots in R. Each plot begins with the `ggplot()` function. In this function we need a few arguments: *data* and *mapping*. Next, we can build up geometric layers until we have the plot looking the way we want. A few basic examples are shown below.
+
+:::fyi
+To learn more about using ggplot2, check out [https://rstudio.cloud/learn/primers/1.1](https://rstudio.cloud/learn/primers/1.1) and [https://rstudio.cloud/learn/primers/3](https://rstudio.cloud/learn/primers/3).
+
+For a more in depth reading about using the ggplot2 package, try the visualization chapter from the free online textbook "R for Data Science" at [https://r4ds.had.co.nz/data-visualisation.html](https://r4ds.had.co.nz/data-visualisation.html)
+:::
+
+## Bar Chart
+
+### Single Categorical Variable
+
+A bar chart is a good way to visualize quantities or counts of for a variable. For example, if I wanted to see whether the number of participants were roughly the same across all levels of a factor, then a bar chart would be a good choice. Using the following bar chart, it is easy to see that the conditions all have around 150 participants each. Be careful that your bar chart includes a value of 0 on the y-axis, otherwise it can be misleading and either exaggerate or hide differences across the columns of the chart.
+
+```{r}
+ggplot(data = data_sugar,
+       mapping = aes(x = IV_condition)) +
+  geom_bar(fill = "royalblue")
+```
+
+### Two Categorical Variables
+
+A clustered bar chart can be created by making some slight changes to the code for a single variable bar chart.
+
+  1. Add another aesthetic to the mapping argument in the `ggplot()` function.  
+    * This tells the `ggplot()` function that we want to color the bars depending on the value of the variable *sex*.
+    
+  2. Remove the *fill* color from the `geom_bar()` function.  
+    * If we did not remove this arugment, it would override step and fill every bar with "royalblue".
+    
+  3. Add a position adjustment to `geom_bar()`  
+    * This makes the bars be placed side-by-side.  
+    * If you are curious, run this code without completing step 3. What happens?
+    
+
+```{r}
+ggplot(data = data_sugar,
+       mapping = aes(x = IV_condition, fill = sex)) +
+  geom_bar(position = position_dodge())
+```
+
+
+:::fyi
+To learn more about Bar Charts, check out [https://rstudio.cloud/learn/primers/3.2](https://rstudio.cloud/learn/primers/3.2).
+:::
+
+## Histogram
+
+When you run the following code, you should see two warnings. Warnings are R's way of trying to draw your attention to something. It is up to you to decide if it is a problem or not. The first warning is saying that by default the `geom_histogram()` function used 30 bins when creating the histogram for you. A histogram bin is like a container which counts how many data points from a single variable fall within a particular range (or binwidth). So, using 30 bins to create a histogram will take the full range of a variable and divide into 30 equally sized bins (all with the same binwidth). That could be too few bins or too many bins. You need to decide if you want to change the number of bins or change the binwidth. The second warning is trying to remind you that the *age* variable has 13 missing values, and as such the missing values could not be placed on the graph.
+
+```{r}
+ggplot(data = data_sugar,
+       mapping = aes(x = age)) +
+    geom_histogram(fill = "royalblue",
+                   color = "black")
+```
+
+:::fyi
+To learn more about histograms, check out [https://rstudio.cloud/learn/primers/3.3](https://rstudio.cloud/learn/primers/3.3).
+:::
+
+## Box Plot
+
+### One Continuous Variable
+
+The following box plot shows the distribution *age* from our example data set. To recreate the graph below yourself, you need to try to solve the puzzle located in the section of this exercise which discusses the `mutate()` function, and then run the code below.
+
+```{r}
+ggplot(data = data_sugar,
+       mapping = aes(y = age)) +
+  geom_boxplot()
+```
+
+### One Continuous/One Catagorical
+
+The following box plot shows the distributions of *age* broken down by each *IV_condition*. To recreate the graph below yourself, you need to try to solve the puzzle located in the section of this exercise which discusses the `mutate()` function, and then run the code below.
+
+```{r}
+ggplot(data = data_sugar,
+       mapping = aes(x = IV_condition, y = age)) +
+  geom_boxplot(aes(fill = IV_condition))
+```
+
+:::fyi
+To learn more about box plots, check out [https://rstudio.cloud/learn/primers/3.4](https://rstudio.cloud/learn/primers/3.4).
+:::
+
+# Acknowledgements
+
+  * The lovely "DIV TIPS" were made using code from a fantastic blog entry by Desirée de leon at [https://desiree.rbind.io/post/2019/making-tip-boxes-with-bookdown-and-rmarkdown/](https://desiree.rbind.io/post/2019/making-tip-boxes-with-bookdown-and-rmarkdown/)
+  * The copy to clipboard buttons were created using Klippy [https://rlesur.github.io/klippy/reference/klippy.html](https://rlesur.github.io/klippy/reference/klippy.html)
+
+
+<a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc/4.0/88x31.png" /></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/">Creative Commons Attribution-NonCommercial 4.0 International License</a>.
