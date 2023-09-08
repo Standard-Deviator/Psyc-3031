@@ -16,7 +16,6 @@ knit: (function(inputFile, encoding) {
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(pwr)
 ```
 
 ```{r klippy, echo=FALSE, include=TRUE}
@@ -26,6 +25,9 @@ klippy::klippy(position = c('top', 'right'))
 ## Power
 
 To conduct a power analysis, we will use a function from the {pwr} package. We specify the sample size (*n*), the significance level (*sig.level*), and the effect size (*d*) we want to be able to detect.
+```{r}
+library(pwr)
+```
 
 ```{r}
 # conduct the the power of the test to detect an effect size of d = .2

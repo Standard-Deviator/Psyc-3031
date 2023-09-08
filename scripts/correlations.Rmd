@@ -123,7 +123,7 @@ datasaurus_dozen %>%
 
 ## Create/Import Data
 
-As usual, the next step is to either load some data into R or create some data ourselves. For the exercises within this lab, we will load some data from the file "gradgpa.csv" (which should be inside the "data" folder within your R project).
+As usual, the next step is to either load some data into R or create some data ourselves. For the exercises within this lab, we will load some data from the file "gradgpa.csv"^[Adapted from pages 258-268 of Polit, D. F. (1996). Data analysis and statistics for nursing research. Stamford, CT: Appleton & Lange] (which should be inside the "data" folder within your R project).
 
 ```{r import_data}
 # import data

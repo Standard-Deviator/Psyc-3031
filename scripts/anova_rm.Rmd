@@ -48,7 +48,7 @@ library(readr)   # importing csv
 
 ## Create/Import Data
 
-The next step is to either load some data into R or create some data ourselves. For the exercises within this lab, we will load some data from the file "stepspday.csv" (which should be inside the "data" folder within your R project).
+The next step is to either load some data into R or create some data ourselves. For the exercises within this lab, we will load some data from the file "stepspday.csv"^[Gravetter, F. J. & Wallnau, L. B. (2016). Statistics for the behavioural sciences. (10th ed.). Belmont, CA: Wadsworth, Cengage Learning.] (which should be inside the "data" folder within your R project).
 
 ```{r import_data}
 # import data and force the read_csv() function to make

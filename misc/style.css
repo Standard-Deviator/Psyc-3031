@@ -88,3 +88,21 @@ div.cols {
   overflow-y: scroll;
   max-height: 100vh;
 }
+
+.btn-klippy div {
+  height: 20px;
+  width: 20px;
+}
+
+.btn-klippy div img.octicon{
+  height: 100% !important;
+  width: 100% !important;
+}
+ 
+pre {
+  transition-duration: .5s;
+}
+  
+pre:hover{
+    box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;
+}

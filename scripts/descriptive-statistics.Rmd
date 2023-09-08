@@ -77,7 +77,7 @@ The code to install the {here} package should **NOT** be included in your script
 
 A message should be printed to the console pane which shows you where R will look for saving or importing your files. When you use an R project with the `here()` function to organize your work it automatically finds the the location of the .rproj file and uses that location for saving and loading files.
 
-For this exercise, we need to tell R that the file we want to load (*Experiment_1.csv*) is inside the *data* folder within our current R project.
+For this exercise, we need to tell R that the file we want to load (*Experiment_1.csv*^[Descriptives – John, L. K., Donnelly, G. E., & Roberto, C. A. (2017). Psychologically informed implementations of sugary-drink portion limits. Psychological Science, 27(5), 620-629.]) is inside the *data* folder within our current R project.
 
 We can accomplish this using the `here()` function.
 
